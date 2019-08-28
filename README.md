@@ -14,4 +14,6 @@ You can analyze the placeholder structure of a pptx by utilizing the analyze_ppt
 The result will show how the master slides layout the placeholders including the indexes of the placeholders.
 
 ## Creating a ppt
-You can create a pptx deck utilizing the create_ppt.py script.
+You can create a pptx deck utilizing the create_ppt.py script. Example:
+
+`python3 create_ppt.py sample_data.csv ppt_sample.pptx ppt_output.pptx`
