@@ -21,26 +21,16 @@ BLANK_SLIDE_LAYOUT = 7
 # Placeholder indices for the first approval slide
 APP_SLIDE1_LAYOUT = 2
 APP_SLIDE1 = {'Key': 27,
-              # 'ID': #,
-              # 'Created': #,
-              # 'Title': #,
               'Department': 23,
-              # 'Classification' #,
               'Description': 1,
               'Status': 24,
               'Return Type': 25,
               'ROI': 15,
-              # 'Break Even Period': #,
               'Return': 16,
-              # 'Duration': #,
               'Total Investment': 17,
-              # 'Labor T-Shirt Size': #,
-              # 'Labor Investment': #,
-              # 'Non-Labor Investment': #,
               'Sponsor': 19,
               'Project Owner': 18,
               'Line of Business': 21,
-              'States': 22,
               'Return Description': 28,
               'Investment Description': 13,
               }
@@ -51,7 +41,6 @@ APP_SLIDE2 = {'Scope': 14,
               'Scope Exclusions': 15,
               'Systems': 17,
               'Business Area Impacts': 16,
-              # 'Additional Information': 18,
               }
 
 # Data Column Names for simplified mapping
@@ -84,66 +73,51 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Scope)': 'Scope',
                 'Custom field (Scope Exclusions)': 'Scope Exclusions',
                 'Custom field (Systems)': 'Systems',
-                'Custom field (States)': 'States',
-                # 'Custom field (Additional Information)':
-                #    'Additional Information',
                 }
 
 
-# functions go here
-def create_ppt_title_slide(prs, title_txt, subtitle_txt):
-    '''Creates a title slide in the presentation'''
-    # choose the Title layout for the slide
-    slide_layout = prs.slide_layouts[TITLE_SLIDE_LAYOUT]
-    slide = prs.slides.add_slide(slide_layout)
-    # assign title text
-    title = slide.shapes.title
-    title.text = title_txt
-    # assign subtitle text
-    subtitle = slide.placeholders[TITLE_SLIDE['subtitle']]
-    subtitle.text = subtitle_txt
-    # Insert a blank slide
-    slide_layout = prs.slide_layouts[BLANK_SLIDE_LAYOUT]
-    slide = prs.slides.add_slide(slide_layout)
+def createSlide(prs, layout_index):
+    '''returns a new slide based on the slide index'''
+    # add the slide from based on the layout
+    slide_layout = prs.slide_layouts[layout_index]
+    return prs.slides.add_slide(slide_layout)
+
+
+def populateSlideFromList(slide, title_txt, placeholder_list):
+    '''Populates a slide in the presentation based on a title,
+    and a list of placeholder index and text pairs.
+    Empty text will skip insertion of that element.'''
+    # insert the title into the slide
+    if title_txt:
+        slide.shapes.title.text = title_txt
+    # place the values into the slide
+    for index, txt in placeholder_list:
+        placeTextInSlide(slide, index, txt)
+
+
+def populateSlideFromSeries(slide, title_txt, placeholder_map, series):
+    '''Populates a slide based on the map of placeholders to a dataframe series.
+    Ensures the data_frame contains the necessary columns. Unknown columns are
+    removed.'''
+    # insert the title into the slide
+    if title_txt:
+        slide.shapes.title.text = title_txt
+    # reduce the placeholder map down to the columns that exsist in the data
+    reduced_placeholder_map = {column_name: placeholder_map[column_name]
+                               for column_name in placeholder_map.keys()
+                               if column_name in series.keys()}
+    # map the data columns to the placeholders
+    for column_name, placeholder_index in reduced_placeholder_map.items():
+        placeTextInSlide(slide, placeholder_index, series[column_name])
 
 
 def placeTextInSlide(slide, placeholderIndex, text):
     '''Inserts text into a slide.
     Handles exceptions with blanks.'''
     try:
-        text = str(text)
-        if text == None:
-            text = '?'
-        if text == 'nan':
-            text = 'NA'
         slide.placeholders[placeholderIndex].text = text
     except TypeError:
         slide.placeholders[placeholderIndex].text = 'Not Available'
-
-
-def create_ppt_approval_slide(prs, title_txt, data):
-    '''Creates a project approval slide in the presentation'''
-
-    # choose the Title layout for the slide
-    slide_layout = prs.slide_layouts[APP_SLIDE1_LAYOUT]
-    slide = prs.slides.add_slide(slide_layout)
-
-    # assign title text
-    slide.shapes.title.text = data["Title"]
-
-    # assign data to placeholder text from the sample ppt
-    for key, value in APP_SLIDE1.items():
-        placeTextInSlide(slide, value, data[key])
-
-    slide_layout = prs.slide_layouts[APP_SLIDE2_LAYOUT]
-    slide = prs.slides.add_slide(slide_layout)
-
-    # assign title text
-    slide.shapes.title.text = data["Title"]
-
-    # assign data to placeholder text from the sample ppt
-    for key, value in APP_SLIDE2.items():
-        placeTextInSlide(slide, value, data[key])
 
 
 def getDataFrame(data_file):
@@ -158,21 +132,28 @@ def create_pptx(data_file, input_file, output_file):
 
     prs = Presentation(input_file)
 
-    # Titles slide
+    # Insert title slide
+    print('Creating title slide.')
     title_txt = "Project Approvals"
     subtitle_txt = "Created on {:%m-%d-%Y}".format(date.today())
-    print('Creating title slide.')
-    create_ppt_title_slide(prs, title_txt, subtitle_txt)
+    placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
+    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+                          title_txt, placeholder_list)
+    # Insert a blank slide
+    createSlide(prs, BLANK_SLIDE_LAYOUT)
 
     # get the data from the data file
     print('Creating data frame.')
     df = getDataFrame(data_file)
 
     # Project Approvals Slides
-    for index, row in df.iterrows():
-        print('Creating approval slide', index + 1, 'of',
-              len(df.index))
-        create_ppt_approval_slide(prs, "Project Approvals", row)
+    for index, series in df.iterrows():
+        print('Creating approval slide ', index + 1, ' of ',
+              len(df.index), '.')
+        populateSlideFromSeries(createSlide(prs, APP_SLIDE1_LAYOUT),
+                                series["Title"], APP_SLIDE1, series)
+        populateSlideFromSeries(createSlide(prs, APP_SLIDE2_LAYOUT),
+                                series["Title"], APP_SLIDE2, series)
 
     prs.save(output_file)
 
