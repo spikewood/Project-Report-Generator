@@ -6,6 +6,15 @@ This project will build the following into it:
 1. A method to read in a csv file into a slide
 1. A way to publish the slides
 
+## Dependencies
+You will need to have both *pptx* and *pandas* modules to run these scripts.
+
+Installing python-pptx through the terminal:
+`pip install python-pptx`
+
+Installing pandas through the terminal:
+`pip install pandas`
+
 ## Analyzing PPT files
 You can analyze the placeholder structure of a pptx by utilizing the analyze_ppt.py script. Example:
 

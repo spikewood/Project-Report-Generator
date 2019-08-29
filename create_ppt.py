@@ -40,17 +40,18 @@ APP_SLIDE1 = {'Key': 27,
               'Sponsor': 19,
               'Project Owner': 18,
               'Line of Business': 21,
-              # 'States': 22,
+              'States': 22,
+              'Return Description': 28,
+              'Investment Description': 13,
               }
 
 # Placeholder indices for the second approval slide
 APP_SLIDE2_LAYOUT = 3
-APP_SLIDE2 = {'Return Description': 1,
-              'Scope': 14,
+APP_SLIDE2 = {'Scope': 14,
               'Scope Exclusions': 15,
               'Systems': 17,
               'Business Area Impacts': 16,
-              'Investment Description': 13,
+              # 'Additional Information': 18,
               }
 
 # Data Column Names for simplified mapping
@@ -83,6 +84,9 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Scope)': 'Scope',
                 'Custom field (Scope Exclusions)': 'Scope Exclusions',
                 'Custom field (Systems)': 'Systems',
+                'Custom field (States)': 'States',
+                # 'Custom field (Additional Information)':
+                #    'Additional Information',
                 }
 
 
@@ -107,6 +111,11 @@ def placeTextInSlide(slide, placeholderIndex, text):
     '''Inserts text into a slide.
     Handles exceptions with blanks.'''
     try:
+        text = str(text)
+        if text == None:
+            text = '?'
+        if text == 'nan':
+            text = 'NA'
         slide.placeholders[placeholderIndex].text = text
     except TypeError:
         slide.placeholders[placeholderIndex].text = 'Not Available'
@@ -161,8 +170,8 @@ def create_pptx(data_file, input_file, output_file):
 
     # Project Approvals Slides
     for index, row in df.iterrows():
-        print('Creating approval slide ', index + 1, ' of ',
-              len(df.index), '.')
+        print('Creating approval slide', index + 1, 'of',
+              len(df.index))
         create_ppt_approval_slide(prs, "Project Approvals", row)
 
     prs.save(output_file)
