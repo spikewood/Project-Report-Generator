@@ -91,8 +91,8 @@ def populateSlideFromList(slide, title_txt, placeholder_list):
     if title_txt:
         slide.shapes.title.text = title_txt
     # place the values into the slide
-    for index, txt in placeholder_list:
-        placeTextInSlide(slide, index, txt)
+    for placeholder_index, txt in placeholder_list:
+        placeTextInSlide(slide, placeholder_index, txt)
 
 
 def populateSlideFromSeries(slide, title_txt, placeholder_map, series):
@@ -102,7 +102,7 @@ def populateSlideFromSeries(slide, title_txt, placeholder_map, series):
     # insert the title into the slide
     if title_txt:
         slide.shapes.title.text = title_txt
-    # reduce the placeholder map down to the columns that exsist in the data
+    # reduce the placeholder map down to the columns that exsist in the series
     reduced_placeholder_map = {column_name: placeholder_map[column_name]
                                for column_name in placeholder_map.keys()
                                if column_name in series.keys()}
