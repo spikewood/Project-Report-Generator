@@ -47,7 +47,7 @@ APP_SLIDE2 = {'Scope': 14,
 COLMUN_NAMES = {'Issue key': 'Key',
                 'Issue id': 'ID',
                 'Created': 'Created',
-                'Summary': 'Title',
+                'Summary': 'Summary',
                 'Custom field (Sponsor Department)': 'Department',
                 'Custom field (Project Classification)':
                     'Classification',
@@ -74,6 +74,21 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Scope Exclusions)': 'Scope Exclusions',
                 'Custom field (Systems)': 'Systems',
                 }
+
+STATUS_MAPPING = {"Project Proposals": ["New Request",
+                                        "Initial Review",
+                                        "More Details Required",
+                                        "Executive Sponsor Review",
+                                        "Estimate Costs",
+                                        "ROI Validation",
+                                        "Executive Committee Review"],
+                  "Inflight Projects": ["Project Approved",
+                                        "Project Scheduled",
+                                        "Project Underway",
+                                        "Project On Hold"],
+                  "Complete Projects": ["Project Complete"],
+                  "Rejected Projects": ["Project Rejected"],
+                  }
 
 
 def createSlide(prs, layout_index):
@@ -130,32 +145,54 @@ def create_pptx(data_file, input_file, output_file):
     '''Take the input powerpoint file and use it as the template
     for the output file.'''
 
-    prs = Presentation(input_file)
-
-    # Insert title slide
-    print('Creating title slide.')
-    title_txt = "Project Approvals"
-    subtitle_txt = "Created on {:%m-%d-%Y}".format(date.today())
-    placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
-    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
-                          title_txt, placeholder_list)
-    # Insert a blank slide
-    createSlide(prs, BLANK_SLIDE_LAYOUT)
-
     # get the data from the data file
     print('Creating data frame.')
     df = getDataFrame(data_file)
 
-    # Project Approvals Slides
-    for index, series in df.iterrows():
-        print('Creating approval slide ', index + 1, ' of ',
-              len(df.index), '.')
-        populateSlideFromSeries(createSlide(prs, APP_SLIDE1_LAYOUT),
-                                series["Title"], APP_SLIDE1, series)
-        populateSlideFromSeries(createSlide(prs, APP_SLIDE2_LAYOUT),
-                                series["Title"], APP_SLIDE2, series)
+    for dept in df['Department'].unique():
+        # build a presentation for each of the departments
+        prs = Presentation(input_file)
 
-    prs.save(output_file)
+        # Insert title slide with department and status_category
+        print('Creating', dept, 'title slide.')
+        for status_category in STATUS_MAPPING:
+            statuses = STATUS_MAPPING[status_category]
+            df_subset = df.loc[df['Department'] == dept]
+            df_subset = df_subset.loc[df['Status'].isin(statuses)]
+            if not df_subset.empty:
+                title_txt = dept + ' ' + status_category
+                subtitle_txt = (dept + ' ' + status_category +
+                                '\nCreated on {:%m-%d-%Y}'.format(date.today())
+                                )
+                placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
+                populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+                                      title_txt, placeholder_list)
+                # Insert a blank slide
+                createSlide(prs, BLANK_SLIDE_LAYOUT)
+
+                # create the slides in status order
+                for status in STATUS_MAPPING[status_category]:
+                    # subset the dataframe to the department rows
+                    print(dept, status)
+                    df_subset = df.loc[(df['Department'] == dept) &
+                                       (df['Status'] == status)]
+                    df_subset = df_subset.sort_values(by=['Summary'])
+                    # Proposed Project Slides
+                    for index, series in df_subset.iterrows():
+                        print('Creating approval slide ', index + 1, 'of',
+                              len(df_subset.index), '.')
+                        title_txt = series["Summary"]
+                        populateSlideFromSeries(createSlide(prs,
+                                                            APP_SLIDE1_LAYOUT),
+                                                title_txt, APP_SLIDE1, series)
+                        populateSlideFromSeries(createSlide(prs,
+                                                            APP_SLIDE2_LAYOUT),
+                                                title_txt, APP_SLIDE2, series)
+
+        dept_output_file = output_file.replace('.pptx', '_' +
+                                               str(dept).replace(' ', '_') +
+                                               '.pptx')
+        prs.save(dept_output_file)
 
 
 if __name__ == "__main__":
