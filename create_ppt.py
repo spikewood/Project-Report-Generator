@@ -28,11 +28,12 @@ APP_SLIDE1 = {'Key': 27,
               'ROI': 15,
               'Return': 16,
               'Total Investment': 17,
-              'Sponsor': 19,
-              'Project Owner': 18,
+              'Sponsor': 18,
+              'Project Owner': 19,
               'Line of Business': 21,
               'Return Description': 28,
               'Investment Description': 13,
+              'Project Manager': 20,
               }
 
 # Placeholder indices for the second approval slide
@@ -73,6 +74,7 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Scope)': 'Scope',
                 'Custom field (Scope Exclusions)': 'Scope Exclusions',
                 'Custom field (Systems)': 'Systems',
+                'Custom field (Project Manager)': 'Project Manager',
                 }
 
 
@@ -129,24 +131,26 @@ def getDataFrame(data_file):
 def create_pptx(data_file, input_file, output_file):
     '''Take the input powerpoint file and use it as the template
     for the output file.'''
-
+    # open the template ppt file
     prs = Presentation(input_file)
-
-    # Insert title slide
-    print('Creating title slide.')
-    title_txt = "Project Approvals"
-    subtitle_txt = "Created on {:%m-%d-%Y}".format(date.today())
-    placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
-    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
-                          title_txt, placeholder_list)
-    # Insert a blank slide
-    createSlide(prs, BLANK_SLIDE_LAYOUT)
 
     # get the data from the data file
     print('Creating data frame.')
     df = getDataFrame(data_file)
 
-    # Project Approvals Slides
+    # get a list of all of the departments
+    # departments = df.Department.unique()
+
+    # insert title slide
+    print('Creating title slide.')
+    subtitle_txt = "Created on {:%m-%d-%Y}".format(date.today())
+    placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
+    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+                          "Project Approvals", placeholder_list)
+    # insert a blank slide
+    createSlide(prs, BLANK_SLIDE_LAYOUT)
+
+    # create the project approval slides
     for index, series in df.iterrows():
         print('Creating approval slide ', index + 1, ' of ',
               len(df.index), '.')
@@ -154,7 +158,7 @@ def create_pptx(data_file, input_file, output_file):
                                 series["Title"], APP_SLIDE1, series)
         populateSlideFromSeries(createSlide(prs, APP_SLIDE2_LAYOUT),
                                 series["Title"], APP_SLIDE2, series)
-
+    # save the generated slide deck
     prs.save(output_file)
 
 
