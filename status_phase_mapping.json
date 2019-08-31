@@ -1,0 +1,30 @@
+{
+  "NEW REQUEST": "Proposed Projects",
+  "INITIAL REVIEW": "Proposed Projects",
+  "MORE DETAILS REQUIRED": "Proposed Projects",
+  "EXECUTIVE SPONSOR REVIEW": "Proposed Projects",
+  "ESTIMATE COSTS": "Proposed Projects",
+  "ROI VALIDATION": "Proposed Projects",
+  "EXECUTIVE COMMITTEE REVIEW": "Proposed Projects",
+  "PROJECT APPROVED": "Inflight Projects",
+  "PROJECT SCHEDULED": "Inflight Projects",
+  "PROJECT UNDERWAY": "Inflight Projects",
+  "PROJECT ON HOLD": "Inflight Projects",
+  "PROJECT COMPLETE": "Completed Projects",
+  "PROJECT REJECTED": "Rejected Projects",
+}
+
+{ "Proposed Statuses": ["NEW REQUEST",
+                        "INITIAL REVIEW",
+                        "MORE DETAILS REQUIRED",
+                        "EXECUTIVE SPONSOR REVIEW",
+                        "ESTIMATE COSTS",
+                        "ROI VALIDATION",
+                        "EXECUTIVE COMMITTEE REVIEW"],
+  "Inflight Statuses": ["PROJECT APPROVED",
+                        "PROJECT SCHEDULED",
+                        "PROJECT UNDERWAY",
+                        "PROJECT ON HOLD"],
+  "Complete Statuses": ["PROJECT COMPLETE"],
+  "Rejected Statuses": ["PROJECT REJECTED"]
+}
