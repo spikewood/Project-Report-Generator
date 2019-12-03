@@ -8,6 +8,7 @@ from pptx import Presentation
 # from pptx.util import Inches
 import argparse
 import pandas as pd
+import os
 from datetime import date
 
 # Classes and globals
@@ -21,7 +22,7 @@ BLANK_SLIDE_LAYOUT = 7
 # Placeholder indices for the first approval slide
 APP_SLIDE1_LAYOUT = 2
 APP_SLIDE1 = {'Key': 27,
-              'Department': 23,
+              'Sponsor Department': 23,
               'Description': 1,
               'Status': 24,
               'Return Type': 25,
@@ -34,11 +35,13 @@ APP_SLIDE1 = {'Key': 27,
               'Return Description': 28,
               'Investment Description': 13,
               'Project Manager': 20,
+              'States': 22,
               }
 
 # Placeholder indices for the second approval slide
 APP_SLIDE2_LAYOUT = 3
-APP_SLIDE2 = {'Scope': 14,
+APP_SLIDE2 = {'Key': 27,
+              'Scope': 14,
               'Scope Exclusions': 15,
               'Systems': 17,
               'Business Area Impacts': 16,
@@ -49,7 +52,7 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Issue id': 'ID',
                 'Created': 'Created',
                 'Summary': 'Summary',
-                'Custom field (Sponsor Department)': 'Department',
+                'Custom field (Sponsor Department)': 'Sponsor Department',
                 'Custom field (Project Classification)':
                     'Classification',
                 'Description': 'Description',
@@ -77,13 +80,13 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Project Manager)': 'Project Manager',
                 }
 
-STATUS_MAPPING = {"Project Proposals": ["New Request",
-                                        "Initial Review",
-                                        "More Details Required",
-                                        "Executive Sponsor Review",
-                                        "Estimate Costs",
-                                        "ROI Validation",
-                                        "Executive Committee Review"],
+STATUS_MAPPING = {"Project Requests": ["New Request",
+                                       "Initial Review",
+                                       "More Details Required",
+                                       "Executive Sponsor Review",
+                                       "Estimate Costs",
+                                       "ROI Validation",
+                                       "Executive Committee Review"],
                   "Inflight Projects": ["Project Approved",
                                         "Project Scheduled",
                                         "Project Underway",
@@ -132,78 +135,131 @@ def placeTextInSlide(slide, placeholderIndex, text):
     '''Inserts text into a slide.
     Handles exceptions with blanks.'''
     try:
-        slide.placeholders[placeholderIndex].text = text
+        text_lines = str(text).splitlines()
+        line_count = 0
+        for line in text_lines:
+            if line_count == 0:
+                if line == 'nan':
+                    slide.placeholders[placeholderIndex].text_frame.text = ''
+                else:
+                    slide.placeholders[placeholderIndex].text_frame.text = line
+            elif line != '':
+                paragraph = slide.placeholders[placeholderIndex] \
+                            .text_frame.add_paragraph()
+                paragraph.text = line
+            line_count += 1
     except TypeError:
         slide.placeholders[placeholderIndex].text = 'Not Available'
+    except KeyError:
+        return
+
+
+def convert_usernames_to_fullnames(data_frame):
+    ''' compares a set of columnns against known usernames and converts them
+        to full names '''
+    return data_frame
+
+
+def clean_data_frame(data_frame):
+    ''' Cleans the data in the data_frame. '''
+    # change usernames to Full Names
+    data_frame = convert_usernames_to_fullnames(data_frame)
+    return data_frame
 
 
 def getDataFrame(data_file):
     data_frame = pd.read_csv(data_file)
     data_frame.rename(columns=COLMUN_NAMES, inplace=True)
+    data_frame = clean_data_frame(data_frame)
     return data_frame
 
 
-def create_pptx(data_file, input_file, output_file):
-    '''Take the input powerpoint file and use it as the template
-    for the output file.'''
+def create_pap_pptx(df, prs, dept, output_filename):
+    # Insert title slide with department and status_category such as
+    #    project request, inflight or complete.
+    for status_category in STATUS_MAPPING:
+        statuses = STATUS_MAPPING[status_category]
+        status_dataframe_subset = df.loc[df['Status'].isin(statuses)]
+        if not status_dataframe_subset.empty:
+            title_txt = dept + ' ' + status_category
+            subtitle_txt = ('\nCreated on {:%m-%d-%Y}'.format(date.today())
+                            )
+            placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
+            populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+                                  title_txt, placeholder_list)
+            # Insert a blank slide
+            createSlide(prs, BLANK_SLIDE_LAYOUT)
 
-    # get the data from the data file
-    print('Creating data frame.')
-    df = getDataFrame(data_file)
+            # create the slides in status order
+            for status in STATUS_MAPPING[status_category]:
+                # subset the dataframe to the department rows
+                print(dept, status)
+                df_subset = df.loc[(df['Sponsor Department'] == dept) &
+                                   (df['Status'] == status)]
+                df_subset = df_subset.sort_values(by=['Summary'])
+                # Proposed Project Slides
+                for index, series in df_subset.iterrows():
+                    print('Creating approval slide', index + 1, 'of',
+                          len(df_subset.index), '.')
+                    title_txt = series["Summary"]
+                    populateSlideFromSeries(createSlide(prs,
+                                                        APP_SLIDE1_LAYOUT),
+                                            title_txt, APP_SLIDE1, series)
+                    populateSlideFromSeries(createSlide(prs,
+                                                        APP_SLIDE2_LAYOUT),
+                                            title_txt, APP_SLIDE2, series)
 
-    for dept in df['Department'].unique():
-        # build a presentation for each of the departments
-        prs = Presentation(input_file)
+        prs.save(output_filename)
 
-        # Insert title slide with department and status_category
-        print('Creating', dept, 'title slide.')
-        for status_category in STATUS_MAPPING:
-            statuses = STATUS_MAPPING[status_category]
-            df_subset = df.loc[df['Department'] == dept]
-            df_subset = df_subset.loc[df['Status'].isin(statuses)]
-            if not df_subset.empty:
-                title_txt = dept + ' ' + status_category
-                subtitle_txt = (dept + ' ' + status_category +
-                                '\nCreated on {:%m-%d-%Y}'.format(date.today())
-                                )
-                placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
-                populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
-                                      title_txt, placeholder_list)
-                # Insert a blank slide
-                createSlide(prs, BLANK_SLIDE_LAYOUT)
 
-                # create the slides in status order
-                for status in STATUS_MAPPING[status_category]:
-                    # subset the dataframe to the department rows
-                    print(dept, status)
-                    df_subset = df.loc[(df['Department'] == dept) &
-                                       (df['Status'] == status)]
-                    df_subset = df_subset.sort_values(by=['Summary'])
-                    # Proposed Project Slides
-                    for index, series in df_subset.iterrows():
-                        print('Creating approval slide ', index + 1, 'of',
-                              len(df_subset.index), '.')
-                        title_txt = series["Summary"]
-                        populateSlideFromSeries(createSlide(prs,
-                                                            APP_SLIDE1_LAYOUT),
-                                                title_txt, APP_SLIDE1, series)
-                        populateSlideFromSeries(createSlide(prs,
-                                                            APP_SLIDE2_LAYOUT),
-                                                title_txt, APP_SLIDE2, series)
+def create_pap_pptxs(dataframe, ppt_template, file_prefix):
+    '''Create a project approval ppt from a dataframe and ppt template.
+        A pap ppt deck will be created for each dept with the output prefix.'''
 
-        dept_output_file = output_file.replace('.pptx', '_' +
-                                               str(dept).replace(' ', '_') +
-                                               '.pptx')
-        prs.save(dept_output_file)
+    # make a folder for the ppts
+    ppt_folder_path = file_prefix.replace('.pptx', '')
+    if not os.path.exists(ppt_folder_path):
+        os.makedirs(ppt_folder_path)
+
+    # create a base path and filename for the ppts
+    ppt_base_file_path = os.path.join(
+                        ppt_folder_path,
+                        os.path.basename(file_prefix) + '.pptx')
+
+    # create a ppt deck for each department
+    for dept in dataframe['Sponsor Department'].unique():
+        # build a ppt deck for each of the departments
+        ppt_deck = Presentation(ppt_template)
+
+        # create the output filename using the file_prefix and department
+        output_ppt_filename = ppt_base_file_path.replace(
+                                '.pptx', '_' + str(dept).replace(' ', '_') +
+                                '.pptx')
+        # get the department specific data
+        dept_dataframe = dataframe.loc[dataframe['Sponsor Department'] == dept]
+
+        # create the powerpoint for the department
+        print('Creating', dept, 'ppt.')
+        create_pap_pptx(dept_dataframe, ppt_deck, dept, output_ppt_filename)
 
 
 if __name__ == "__main__":
+    ''' This script pulls two arguments, one for the csv data source and
+        the other for the output data file base directory and path'''
+
+    # Pull two arguments - one for the source data and the other for the
+    # output file folder name and prefix
     parser = argparse.ArgumentParser()
     parser.add_argument("dataSource", type=str,
                         help="data source")
-    parser.add_argument("pptxSource", type=str,
-                        help="source pptx")
     parser.add_argument("pptxDestination", type=str,
                         help="destination pptx")
     args = parser.parse_args()
-    create_pptx(args.dataSource, args.pptxSource, args.pptxDestination)
+
+    # get the data from the data file
+    print('Creating data frame.')
+    pap_data_frame = getDataFrame(args.dataSource)
+
+    # print the PAP ppt
+    print('Creating pap pptx.')
+    create_pap_pptxs(pap_data_frame, "ppt_template.pptx", args.pptxDestination)
