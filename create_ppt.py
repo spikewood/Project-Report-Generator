@@ -66,8 +66,7 @@ COLMUN_NAMES = {'Issue key': 'Key',
                 'Custom field (Labor T-Shirt Size)': 'Labor T-Shirt Size',
                 'Custom field (Labor Investment)': 'Labor Investment',
                 'Custom field (Non-Labor Investment)': 'Non-Labor Investment',
-                'Custom field (Executive Sponsor)': 'Sponsor',
-                'Custom field (Sponsor)': 'Project Owner',
+                'Custom field (Sponsor)': 'Sponsor',
                 'Custom field (Business Area Impacts)':
                     'Business Area Impacts',
                 'Custom field (Labor Investment Description)':
@@ -157,6 +156,15 @@ def placeTextInSlide(slide, placeholderIndex, text):
 def convert_usernames_to_fullnames(data_frame):
     ''' compares a set of columnns against known usernames and converts them
         to full names '''
+    name_df = pd.read_csv("name_mapping.csv")
+    name_dict = name_df.to_dict()
+    name_dict = {name_df['Username'][ind]: name_df['Full Name'][ind]
+                 for ind in name_df.index}
+
+    data_frame["Project Manager"] = data_frame["Project Manager"].map(
+                                        name_dict)
+    data_frame["Sponsor"] = data_frame["Sponsor"].map(
+                                        name_dict)
     return data_frame
 
 
