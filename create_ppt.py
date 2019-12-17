@@ -14,15 +14,19 @@ from datetime import date
 
 # Classes and globals
 
+PPT_TEMPLATE = "project_request_template.pptx"
+
 # Placeholder layout and indices for the Title Slide
 TITLE_SLIDE_LAYOUT = 0
 TITLE_SLIDE = {'subtitle': 1}
 
 # Placeholder layout for blank slides
-BLANK_SLIDE_LAYOUT = 7
+BLANK_SLIDE_LAYOUT = 4
+
+PAP_ALL_SLIDES_MAPPING = {'Summary': 'Title'}
 
 # Placeholder indices for the first approval slide
-PAP_SLIDE1_LAYOUT = 2
+PAP_SLIDE1_LAYOUT = 1
 PAP_SLIDE1_COLUMN_MAPPING = {'Key': 27,
                              'Sponsor Department': 23,
                              'Description': 1,
@@ -40,13 +44,25 @@ PAP_SLIDE1_COLUMN_MAPPING = {'Key': 27,
                              }
 
 # Placeholder indices for the second approval slide
-PAP_SLIDE2_LAYOUT = 3
+PAP_SLIDE2_LAYOUT = 2
 PAP_SLIDE2_COLUMN_MAPPING = {'Key': 27,
                              'Scope': 14,
                              'Scope Exclusions': 15,
                              'Systems': 17,
                              'Business Area Impacts': 16,
                              }
+
+REQUEST_SLIDE_LAYOUT = 3
+REQUEST_SLIDE_COLUMN_MAPPING = {'Key': 27,
+                                'Sponsor Department': 23,
+                                'Description': 1,
+                                'Status': 24,
+                                'Sponsor': 18,
+                                'Line of Business': 21,
+                                'Return Description': 28,
+                                'Project Manager': 20,
+                                'States': 22,
+                                }
 
 # Data Column Names for simplified mapping
 COLUMNS = {'Issue key': 'Key',
@@ -79,17 +95,20 @@ COLUMNS = {'Issue key': 'Key',
            'Custom field (Project Manager)': 'Project Manager',
            }
 
-STATUS_MAPPING = {"Project Requests": ["New Request",
-                                       "Initial Review",
-                                       "More Details Required",
-                                       "Executive Sponsor Review",
-                                       "Estimate Costs",
-                                       "ROI Validation",
-                                       "Executive Committee Review"],
-                  "Inflight Projects": ["Project Approved",
-                                        "Project Scheduled",
-                                        "Project Underway",
-                                        "Project On Hold"],
+STATUS_MAPPING = {"Project Request Approval": ["New Request",
+                                               "More Details Required",
+                                               "Sponsor Review",
+                                               "Executive Sponsor Review",
+                                               "Executive Committee Review",
+                                               "Future Consideration"],
+                  "Project Schedule Approval": ["Project Approved",
+                                                "Scope Project",
+                                                "Estimate Cost and Duration",
+                                                "ROI Validation",
+                                                "Portfolio Scheduling"],
+                  "Inflight Projects": ["Project Scheduled",
+                                        "Project In Progress"],
+                  "On Hold Projects": ["Project On Hold"],
                   "Complete Projects": ["Project Complete"],
                   "Rejected Projects": ["Project Rejected"],
                   }
@@ -155,6 +174,47 @@ def placeTextInSlide(slide, placeholderIndex, text):
         return
 
 
+def create_title_slides(prs, title_txt, subtitle_txt):
+    ''' Create a title slide '''
+    placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
+
+    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+                          title_txt, placeholder_list)
+    # Insert a blank slide
+    # createSlide(prs, BLANK_SLIDE_LAYOUT)
+
+
+def create_project_request_slides(prs, title_txt, series):
+    ''' Creates a project request slide pair. '''
+    project_request_slide = createSlide(prs, REQUEST_SLIDE_LAYOUT)
+    populateSlideFromSeries(project_request_slide, title_txt,
+                            REQUEST_SLIDE_COLUMN_MAPPING,
+                            series)
+    # createSlide(prs, BLANK_SLIDE_LAYOUT)
+
+
+def create_project_status_slides(prs, title_txt, series):
+    ''' Create a project status slide pair. '''
+    first_status_slide = createSlide(prs, PAP_SLIDE1_LAYOUT)
+    populateSlideFromSeries(first_status_slide, title_txt,
+                            PAP_SLIDE1_COLUMN_MAPPING,
+                            series)
+
+    second_status_slide = createSlide(prs, PAP_SLIDE2_LAYOUT)
+    populateSlideFromSeries(second_status_slide, title_txt,
+                            PAP_SLIDE2_COLUMN_MAPPING,
+                            series)
+
+
+def unique_list(list_of_lists):
+    ''' Takes in a list of lists, combines them and returns the unique items'''
+    # combine the lists
+    combined_list = [item for sublist in list_of_lists for item in sublist]
+    # use numpy to return the unique items in the list
+    np_list = np.array(combined_list)
+    return np.unique(np_list)
+
+
 def convert_usernames_to_fullnames(data_frame):
     ''' compares a set of columnns against known usernames and converts them
         to full names '''
@@ -163,6 +223,7 @@ def convert_usernames_to_fullnames(data_frame):
     name_dict = {name_df['Username'][ind]: name_df['Full Name'][ind]
                  for ind in name_df.index}
     for column in COLUMNS_WITH_NAMES:
+        # data_frame[column] = data_frame[column].map(name_dict)
         data_frame[column] = data_frame[column].map(name_dict)
     return data_frame
 
@@ -170,17 +231,18 @@ def convert_usernames_to_fullnames(data_frame):
 def reduce_data_frame_columns(data_frame):
     ''' reduces the columns to just those needed for the pap'''
     # get the needed column names for the slide decks
-    needed_columns = (PAP_SLIDE1_COLUMN_MAPPING.keys() +
-                      PAP_SLIDE2_COLUMN_MAPPING.keys())
+    needed_columns = unique_list([list(PAP_SLIDE1_COLUMN_MAPPING.keys()),
+                                  list(PAP_SLIDE2_COLUMN_MAPPING.keys()),
+                                  list(PAP_ALL_SLIDES_MAPPING.keys())])
     # filter the data_frame to just those needed columnns
-    data_frame = data_frame.filter(needed_columns.unique())
+    data_frame = data_frame.filter(needed_columns)
     return data_frame
 
 
 def clean_data_frame(data_frame):
     ''' Cleans the data in the data_frame. '''
     # Update column names in the data_frame
-    data_frame.rename(columns=COLUMNS, inplace=True)
+    data_frame = data_frame.rename(columns=COLUMNS)
     # reduce the columns to those needed
     data_frame = reduce_data_frame_columns(data_frame)
     # change usernames to Full Names
@@ -197,18 +259,15 @@ def getDataFrame(data_file):
 def create_pap_pptx(df, prs, item, output_filename):
     # Insert title slide with department and status_category such as
     #    project request, inflight or complete.
+
     for status_category in STATUS_MAPPING:
         statuses = STATUS_MAPPING[status_category]
         status_dataframe_subset = df.loc[df['Status'].isin(statuses)]
         if not status_dataframe_subset.empty:
-            title_txt = item + ' ' + status_category
-            subtitle_txt = ('\nCreated on {:%m-%d-%Y}'.format(date.today())
-                            )
-            placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
-            populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
-                                  title_txt, placeholder_list)
-            # Insert a blank slide
-            createSlide(prs, BLANK_SLIDE_LAYOUT)
+            # Create section title slide
+            title_txt = item + '\n' + status_category
+            subtitle_txt = ('Created: {:%m-%d-%Y}'.format(date.today()))
+            create_title_slides(prs, title_txt, subtitle_txt)
 
             # create the slides in status order
             for status in STATUS_MAPPING[status_category]:
@@ -217,21 +276,18 @@ def create_pap_pptx(df, prs, item, output_filename):
                 df_subset = df_subset.sort_values(by=['Summary'])
                 i = 0
                 for index, series in df_subset.iterrows():
-                    if (len(df_subset.index) > 0) and (i == 0):
-                        print(item, '-', status)
+                    if (i == 0):
+                        print(' *', status, '-', len(df_subset.index),
+                              'slides')
                         # Proposed Project Slides
                     i += 1
-                    print('Creating slide', i, 'of',
+                    print('  + Creating slide', i, 'of',
                           len(df_subset.index), '.')
                     title_txt = series["Summary"]
-
-                    first_pap_slide = createSlide(prs, PAP_SLIDE1_LAYOUT)
-                    populateSlideFromSeries(first_pap_slide, title_txt,
-                                            PAP_SLIDE1_COLUMN_MAPPING, series)
-
-                    second_pap_slide = createSlide(prs, PAP_SLIDE2_LAYOUT)
-                    populateSlideFromSeries(second_pap_slide, title_txt,
-                                            PAP_SLIDE2_COLUMN_MAPPING, series)
+                    if status_category == "Project Request Approval":
+                        create_project_request_slides(prs, title_txt, series)
+                    else:
+                        create_project_status_slides(prs, title_txt, series)
 
         prs.save(output_filename)
 
@@ -270,7 +326,7 @@ def create_pap_pptxs(data_frame, ppt_template, file_prefix):
         item_dataframe = data_frame.loc[data_frame[slice] == item]
 
         # create the powerpoint for the department
-        print('Creating', item, 'ppt.', len(item_dataframe))
+        print('Creating', item, 'ppt.', len(item_dataframe), 'slides.')
         create_pap_pptx(item_dataframe, ppt_deck, item, output_ppt_filename)
 
 
@@ -293,4 +349,4 @@ if __name__ == "__main__":
 
     # print the PAP ppt
     print('Creating pap pptx.')
-    create_pap_pptxs(pap_data_frame, "ppt_template.pptx", args.pptxDestination)
+    create_pap_pptxs(pap_data_frame, PPT_TEMPLATE, args.pptxDestination)

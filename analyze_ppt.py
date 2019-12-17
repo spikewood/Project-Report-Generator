@@ -15,7 +15,8 @@ def parse_args():
     """ Setup the input and output arguments for the script
     Return the parsed input and output files
     """
-    parser = argparse.ArgumentParser(description='Analyze powerpoint file structure')
+    parser = argparse.ArgumentParser(
+                description='Analyze powerpoint file structure')
     parser.add_argument('infile',
                         type=argparse.FileType('r'),
                         help='Powerpoint file to be analyzed')
@@ -45,10 +46,11 @@ def analyze_ppt(input, output):
         for shape in slide.placeholders:
             if shape.is_placeholder:
                 phf = shape.placeholder_format
-                # Do not overwrite the title which is just a special placeholder
+                # Do not overwrite the title which is a special placeholder
                 try:
                     if 'Title' not in shape.text:
-                        shape.text = 'Placeholder index:{} type:{}'.format(phf.idx, shape.name)
+                        shape.text = 'Placeholder index:{} type:{}'.format(
+                                        phf.idx, shape.name)
                 except AttributeError:
                     print("{} has no text attribute".format(phf.type))
                 print('{} {}'.format(phf.idx, shape.name))
