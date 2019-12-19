@@ -13,6 +13,7 @@ import os
 from datetime import date
 
 # Classes and globals
+DOUBLE_SIDED_PRINTING = False
 
 PPT_TEMPLATE = "project_request_template.pptx"
 
@@ -110,7 +111,7 @@ STATUS_MAPPING = {"Project Request Approval": ["New Request",
                                         "Project In Progress"],
                   "On Hold Projects": ["Project On Hold"],
                   "Complete Projects": ["Project Complete"],
-                  "Rejected Projects": ["Project Rejected"],
+                  "Rejected Projects": ["Operational", "Project Rejected"],
                   }
 
 COLUMNS_WITH_NAMES = ['Project Manager', 'Sponsor']
@@ -174,36 +175,45 @@ def placeTextInSlide(slide, placeholderIndex, text):
         return
 
 
-def create_title_slides(prs, title_txt, subtitle_txt):
+def create_title_slides(presentation, title_txt, subtitle_txt):
     ''' Create a title slide '''
+    # create the title slide in the presentation
     placeholder_list = [(TITLE_SLIDE['subtitle'], subtitle_txt)]
-
-    populateSlideFromList(createSlide(prs, TITLE_SLIDE_LAYOUT),
+    # populate the placeholders in the title slide with the subtitle
+    populateSlideFromList(createSlide(presentation, TITLE_SLIDE_LAYOUT),
                           title_txt, placeholder_list)
-    # Insert a blank slide
-    # createSlide(prs, BLANK_SLIDE_LAYOUT)
+    # create a blank slide in between slides to support double sided printing
+    if DOUBLE_SIDED_PRINTING:
+        createSlide(presentation, BLANK_SLIDE_LAYOUT)
 
 
-def create_project_request_slides(prs, title_txt, series):
+def create_project_request_slides(presentation, title_txt, data):
     ''' Creates a project request slide pair. '''
-    project_request_slide = createSlide(prs, REQUEST_SLIDE_LAYOUT)
+    # create the project request first slide in the presentation
+    project_request_slide = createSlide(presentation, REQUEST_SLIDE_LAYOUT)
+    # populate the placeholders in the project status slide with the data
     populateSlideFromSeries(project_request_slide, title_txt,
                             REQUEST_SLIDE_COLUMN_MAPPING,
-                            series)
-    # createSlide(prs, BLANK_SLIDE_LAYOUT)
+                            data)
+    # create a blank slide in between slides to support double sided printing
+    if DOUBLE_SIDED_PRINTING:
+        createSlide(presentation, BLANK_SLIDE_LAYOUT)
 
 
-def create_project_status_slides(prs, title_txt, series):
+def create_project_status_slides(presentation, title_txt, data):
     ''' Create a project status slide pair. '''
-    first_status_slide = createSlide(prs, PAP_SLIDE1_LAYOUT)
+    # create the project status first slide in the presentation
+    first_status_slide = createSlide(presentation, PAP_SLIDE1_LAYOUT)
+    # populate the placeholders in the project status slide with the data
     populateSlideFromSeries(first_status_slide, title_txt,
                             PAP_SLIDE1_COLUMN_MAPPING,
-                            series)
-
-    second_status_slide = createSlide(prs, PAP_SLIDE2_LAYOUT)
+                            data)
+    # create the project status second slide in the presentation
+    second_status_slide = createSlide(presentation, PAP_SLIDE2_LAYOUT)
+    # populate the placeholders in the project status slide
     populateSlideFromSeries(second_status_slide, title_txt,
                             PAP_SLIDE2_COLUMN_MAPPING,
-                            series)
+                            data)
 
 
 def unique_list(list_of_lists):
@@ -222,15 +232,15 @@ def convert_usernames_to_fullnames(data_frame):
     name_df = pd.read_csv("name_mapping.csv")
     name_dict = {name_df['Username'][ind]: name_df['Full Name'][ind]
                  for ind in name_df.index}
+    # map the full names to the user names
     for column in COLUMNS_WITH_NAMES:
-        # data_frame[column] = data_frame[column].map(name_dict)
         data_frame[column] = data_frame[column].map(name_dict)
     return data_frame
 
 
 def reduce_data_frame_columns(data_frame):
     ''' reduces the columns to just those needed for the pap'''
-    # get the needed column names for the slide decks
+    # get only the needed column names for the slide decks
     needed_columns = unique_list([list(PAP_SLIDE1_COLUMN_MAPPING.keys()),
                                   list(PAP_SLIDE2_COLUMN_MAPPING.keys()),
                                   list(PAP_ALL_SLIDES_MAPPING.keys())])
@@ -256,7 +266,7 @@ def getDataFrame(data_file):
     return data_frame
 
 
-def create_pap_pptx(df, prs, item, output_filename):
+def create_pap_pptx(df, prs, item, output_filename, sort_column):
     # Insert title slide with department and status_category such as
     #    project request, inflight or complete.
 
@@ -273,7 +283,8 @@ def create_pap_pptx(df, prs, item, output_filename):
             for status in STATUS_MAPPING[status_category]:
                 # subset the dataframe to the department rows
                 df_subset = df.loc[(df['Status'] == status)]
-                df_subset = df_subset.sort_values(by=['Summary'])
+                df_subset = df_subset.sort_values(by=["Summary"])
+                df_subset = df_subset.sort_values(by=[sort_column])
                 i = 0
                 for index, series in df_subset.iterrows():
                     if (i == 0):
@@ -292,7 +303,7 @@ def create_pap_pptx(df, prs, item, output_filename):
         prs.save(output_filename)
 
 
-def create_pap_pptxs(data_frame, ppt_template, file_prefix):
+def create_pap_pptxs(data_frame, ppt_template, file_prefix, ppt_structure):
     '''Create a project approval ppt from a dataframe and ppt template.
         A pap ppt deck will be created for each dept with the output prefix.'''
 
@@ -307,7 +318,8 @@ def create_pap_pptxs(data_frame, ppt_template, file_prefix):
                         os.path.basename(file_prefix))
 
     # slice determines the breakdown of project requests into ppts.
-    slice = 'Sponsor'
+    slice = ppt_structure['Slice PPTs']
+    sort = ppt_structure['Sort By']
 
     # any slice that is blank or nan should be marked unknown
     data_frame[slice] = data_frame[slice].replace(np.nan, 'Unknown',
@@ -327,7 +339,8 @@ def create_pap_pptxs(data_frame, ppt_template, file_prefix):
 
         # create the powerpoint for the department
         print('Creating', item, 'ppt.', len(item_dataframe), 'slides.')
-        create_pap_pptx(item_dataframe, ppt_deck, item, output_ppt_filename)
+        create_pap_pptx(item_dataframe, ppt_deck, item, output_ppt_filename,
+                        sort)
 
 
 if __name__ == "__main__":
@@ -341,12 +354,22 @@ if __name__ == "__main__":
                         help="data source")
     parser.add_argument("pptxDestination", type=str,
                         help="destination pptx")
+    parser.add_argument('--dbl', dest='double', action='store_const',
+                        const=True, default=False,
+                        help='forces double sided printing (default: False)')
     args = parser.parse_args()
 
     # get the data from the data file
     print('Creating data frame.')
     pap_data_frame = getDataFrame(args.dataSource)
 
+    # set double sided printing flag
+    DOUBLE_SIDED_PRINTING = args.double
+
+    ppt_structure = {'Slice PPTs': 'Status',
+                     'Sort By': 'Sponsor Department'}
+
     # print the PAP ppt
     print('Creating pap pptx.')
-    create_pap_pptxs(pap_data_frame, PPT_TEMPLATE, args.pptxDestination)
+    create_pap_pptxs(pap_data_frame, PPT_TEMPLATE, args.pptxDestination,
+                     ppt_structure)
