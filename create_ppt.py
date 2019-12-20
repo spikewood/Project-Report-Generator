@@ -63,6 +63,7 @@ REQUEST_SLIDE_COLUMN_MAPPING = {'Key': 27,
                                 'Return Description': 28,
                                 'Project Manager': 20,
                                 'States': 22,
+                                'Return Type': [29, 30]
                                 }
 
 # Data Column Names for simplified mapping
@@ -101,9 +102,9 @@ STATUS_MAPPING = {"Project Request Approval": ["New Request",
                                                "Sponsor Review",
                                                "Executive Sponsor Review",
                                                "Executive Committee Review",
+                                               "Project Approved",
                                                "Future Consideration"],
-                  "Project Schedule Approval": ["Project Approved",
-                                                "Scope Project",
+                  "Project Schedule Approval": ["Scope Project",
                                                 "Estimate Cost and Duration",
                                                 "ROI Validation",
                                                 "Portfolio Scheduling"],
@@ -152,7 +153,33 @@ def populateSlideFromSeries(slide, title_txt, placeholder_map, series):
         placeTextInSlide(slide, placeholder_index, series[column_name])
 
 
-def placeTextInSlide(slide, placeholderIndex, text):
+def placeParagraphInPlaceholder(slide, placeholder_index, text):
+    ''' Places a paragraph in the placeholder list or integer
+    and puts the text in the paragraph'''
+    if type(placeholder_index) is list:
+        for index in placeholder_index:
+            paragraph = slide.placeholders[index].text_frame.add_paragraph()
+            paragraph.text = text
+    elif type(placeholder_index) is int:
+        paragraph = slide.placeholders[placeholder_index] \
+            .text_frame.add_paragraph()
+        paragraph.text = text
+    else:
+        print("Placeholder", placeholder_index, "doesn't exist.")
+
+
+def placeTextInPlaceholder(slide, placeholder_index, text):
+    ''' Places text in a placeholder list or integer.'''
+    if type(placeholder_index) is list:
+        for index in placeholder_index:
+            slide.placeholders[index].text_frame.text = text
+    elif type(placeholder_index) is int:
+        slide.placeholders[placeholder_index].text_frame.text = text
+    else:
+        print("Placeholder", placeholder_index, "doesn't exist.")
+
+
+def placeTextInSlide(slide, placeholder_index, text):
     '''Inserts text into a slide.
     Handles exceptions with blanks.'''
     try:
@@ -161,16 +188,14 @@ def placeTextInSlide(slide, placeholderIndex, text):
         for line in text_lines:
             if line_count == 0:
                 if line == 'nan':
-                    slide.placeholders[placeholderIndex].text_frame.text = ''
+                    placeTextInPlaceholder(slide, placeholder_index, '')
                 else:
-                    slide.placeholders[placeholderIndex].text_frame.text = line
+                    placeTextInPlaceholder(slide, placeholder_index, line)
             elif line != '':
-                paragraph = slide.placeholders[placeholderIndex] \
-                            .text_frame.add_paragraph()
-                paragraph.text = line
+                placeParagraphInPlaceholder(slide, placeholder_index, line)
             line_count += 1
     except TypeError:
-        slide.placeholders[placeholderIndex].text = 'Not Available'
+        placeTextInPlaceholder(slide, placeholder_index, 'Not Available')
     except KeyError:
         return
 
@@ -187,10 +212,19 @@ def create_title_slides(presentation, title_txt, subtitle_txt):
         createSlide(presentation, BLANK_SLIDE_LAYOUT)
 
 
+def cleanReturnTypeColumnForProjectRequests(data):
+    '''Removes all values from the return type column except Compliance'''
+    data['Return Type'] = (lambda x: x if x == 'Compliance' else ' ')(
+                            data['Return Type'])
+    return data
+
+
 def create_project_request_slides(presentation, title_txt, data):
     ''' Creates a project request slide pair. '''
     # create the project request first slide in the presentation
     project_request_slide = createSlide(presentation, REQUEST_SLIDE_LAYOUT)
+    # !modify dataframe to support fields needed for project requests
+    data = cleanReturnTypeColumnForProjectRequests(data)
     # populate the placeholders in the project status slide with the data
     populateSlideFromSeries(project_request_slide, title_txt,
                             REQUEST_SLIDE_COLUMN_MAPPING,
@@ -201,7 +235,8 @@ def create_project_request_slides(presentation, title_txt, data):
 
 
 def create_project_status_slides(presentation, title_txt, data):
-    ''' Create a project status slide pair. '''
+    ''' Create a project status slide pair.
+    --- maybe pass in a list of the layouts '''
     # create the project status first slide in the presentation
     first_status_slide = createSlide(presentation, PAP_SLIDE1_LAYOUT)
     # populate the placeholders in the project status slide with the data
@@ -366,6 +401,7 @@ if __name__ == "__main__":
     # set double sided printing flag
     DOUBLE_SIDED_PRINTING = args.double
 
+    # --- pass this in as an argument
     ppt_structure = {'Slice PPTs': 'Status',
                      'Sort By': 'Sponsor Department'}
 
